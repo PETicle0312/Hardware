@@ -30,9 +30,10 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 #last_detect_time = 0
 #COOLDOWN = 2  # 분류 후 대기시간
 #DELAY = 1     # 감지 후 처리 지연
+studentNumber = input("학번 입력 : ")
 
 count = 0
-studentNumber = input("학번 입력 : ")
+
 
 def send_data_to_backend(student_number, device_id, input_count):
     """
@@ -40,7 +41,7 @@ def send_data_to_backend(student_number, device_id, input_count):
     """
     payload = {
         #'userId': user_id,
-        'studentNumber': student_number, # DTO에 studentNumber 필드가 있다면 userId와 동일하게 설정 (학번이 userId인 경우)
+        'studentNumber': student_number, # DTO에 studentNumber 필드가 있다면 
         'deviceId': device_id,
         'inputCount': input_count,
         'inputTime': datetime.now().isoformat() # ISO 8601 형식으로 현재 시간 전송
@@ -75,7 +76,9 @@ while True:
             cv2.imshow("Result", frame)
             key = cv2.waitKey(10)
             if key == 27:  # ESC 키
-                print(studentNumber, " 학생은 ", count, "개의 PET을 투입했습니다.")
+                print(f"{studentNumber} 학생은 총 {count}개의 PET을 투입했습니다.")
+                if count > 0:
+                    send_data_to_backend(studentNumber, DEVICE_ID, count)  # 🔁 한 번에 전송
                 break
             elif key != ord(' ') :
                 continue
@@ -104,9 +107,8 @@ while True:
                 if top1_conf > 0.95 :
                     print("정상")
                     ser.write(b'L')  # 모터 왼쪽 회전
-                    count = count + 1
+                    count += 1
                     #point 저장 로직 또는 API 호출 위치 (svc call or DB update)
-                    send_data_to_backend(studentNumber, DEVICE_ID, 1) # 함수 호출
                 else :
                     print("이물질이 있을 수 있음.")
                     ser.write(b'R')  # 모터 왼쪽 회전
