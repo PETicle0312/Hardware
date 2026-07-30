@@ -1,0 +1,7 @@
+# PETicle Hardware - yolo.py 실행에 필요한 패키지
+# 설치:  pip install -r requirements.txt
+ultralytics
+opencv-python
+numpy
+pyserial
+requests
