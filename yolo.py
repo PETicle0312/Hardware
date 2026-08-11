@@ -4,7 +4,14 @@ import numpy as np
 import serial
 import time
 import requests
+import logging
 from datetime import datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 ser = serial.Serial('COM5', 9600, timeout=1)
 time.sleep(2)
@@ -33,23 +40,17 @@ def send_data_to_backend(student_number, device_id, input_count):
         'inputCount': input_count,
         'inputTime': datetime.now().isoformat()
     }
-    print(f"Attempting to send data to backend: {payload}")
+    logger.info("Backend input transmission started.")
     try:
         response = requests.post(BACKEND_API_URL, json=payload, timeout=5)
         response.raise_for_status()
-        try:
-            response_data = response.json()
-        except ValueError:
-            response_data = response.text
-        print(f"Data sent successfully! Server response: {response_data}")
+        logger.info("Backend input transmission succeeded.")
         return True
     except requests.exceptions.Timeout:
-        print("Error: Request to backend timed out.")
+        logger.warning("Backend input transmission timed out.")
         return False
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending data to backend: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Server error response: {e.response.text}")
+    except requests.exceptions.RequestException:
+        logger.exception("Backend input transmission failed.")
         return False
 
 while True:
@@ -62,7 +63,7 @@ while True:
             cv2.imshow("Result", frame)
             key = cv2.waitKey(10)
             if key == 27:  # ESC 키
-                print(f"{studentNumber} 학생은 총 {count}개의 PET을 투입했습니다.")
+                logger.info("Bottle input session finished. inputCount=%s", count)
                 if count > 0:
                     send_data_to_backend(studentNumber, DEVICE_ID, count)
                 break
@@ -72,33 +73,32 @@ while True:
             results = model.predict(frame, task="classify", verbose=False)
 
             r = results[0]
-            print(r.probs)
             top1_index = r.probs.top1 
             top1_conf = r.probs.top1conf
             class_name = r.names[top1_index]
 
-            print(f"Predicted class: {class_name} ({top1_conf:.2f})")
+            logger.debug("Bottle classification completed. class=%s confidence=%.2f", class_name, top1_conf)
 
             if class_name == 'background':
                 time.sleep(1.0)
 
             elif class_name == 'clean':
                 if top1_conf > 0.95 :
-                    print("정상")
+                    logger.debug("Clean bottle detected.")
                     ser.write(b'L')
                     count += 1
                 else :
-                    print("이물질이 있을 수 있음.")
+                    logger.debug("Bottle classification confidence was below the acceptance threshold.")
                     ser.write(b'R')
                 time.sleep(2.0)
                 
             elif class_name =='label':
-                print("라벨있음")
+                logger.debug("Labelled bottle detected.")
                 ser.write(b'R')
                 time.sleep(2.0)
 
             else :
-                print("패트병이 아님")
+                logger.debug("Non-PET item detected.")
                 ser.write(b'R')
                 time.sleep(2.0)
 
